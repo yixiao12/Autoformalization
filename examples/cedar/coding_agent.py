@@ -5,7 +5,7 @@ from archetypes.coding.naive import agent
 from loguru import logger
 
 from cedar import PolicySet, Schema
-from sondera import CedarPolicyHarness, Decision, Event, Prompt, ToolCall
+from sondera import CedarPolicyHarness, Decision, Event, Prompt, PromptRole, ToolCall
 from sondera.harness.cedar.schema import agent_to_cedar_schema
 
 logger.remove()
@@ -22,21 +22,21 @@ logger.debug(schema.to_cedarschema())
 policy_set = PolicySet("""
 // Allow all user prompts
 @id("allow-prompts")
-permit(principal, action == Coding_Agent::Action::"Prompt", resource);
+permit(principal, action == coding_agent::Action::"Prompt", resource);
 
 // Allow all tool invocations by default (restricted by forbid rules below)
 @id("allow-tool-use")
-permit(principal, action == Coding_Agent::Action::"PreToolUse", resource);
+permit(principal, action == coding_agent::Action::"PreToolUse", resource);
 
 // Allow all tool outputs
 @id("allow-tool-output")
-permit(principal, action == Coding_Agent::Action::"ToolOutput", resource);
+permit(principal, action == coding_agent::Action::"ToolOutput", resource);
 
 // Forbid writing to sensitive configuration files
 @id("forbid-sensitive-write")
 forbid(
   principal,
-  action == Coding_Agent::Action::"PreToolUse",
+  action == coding_agent::Action::"PreToolUse",
   resource
 )
 when {
@@ -52,7 +52,7 @@ when {
 @id("forbid-sensitive-edit")
 forbid(
   principal,
-  action == Coding_Agent::Action::"PreToolUse",
+  action == coding_agent::Action::"PreToolUse",
   resource
 )
 when {
@@ -67,7 +67,7 @@ when {
 @id("forbid-dangerous-bash")
 forbid(
   principal,
-  action == Coding_Agent::Action::"PreToolUse",
+  action == coding_agent::Action::"PreToolUse",
   resource
 )
 when {
@@ -83,7 +83,7 @@ when {
 @id("forbid-untrusted-fetch")
 forbid(
   principal,
-  action == Coding_Agent::Action::"PreToolUse",
+  action == coding_agent::Action::"PreToolUse",
   resource
 )
 when {
@@ -120,7 +120,7 @@ async def main():
     await harness.initialize(agent=agent)
 
     result = await harness.adjudicate(
-        _event(harness, Prompt(role="user", content="Hello world!"))
+        _event(harness, Prompt(role=PromptRole.USER, content="Hello world!"))
     )
     logger.success(f"User prompt. Decision: {result.decision}")
     assert result.decision == Decision.ALLOW

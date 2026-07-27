@@ -1,0 +1,22 @@
+# Model configuration for the Autoformalization Generator, Judge, and Verifier.
+# The API key is read from OPENAI_API_KEY; it is never stored in this file.
+
+model_provider = "OpenAI"
+model = "gpt-5.5"
+review_model = "gpt-5.5"
+judge_temperature = 0.3
+verifier_temperature = 0.1
+model_reasoning_effort = "medium"
+disable_response_storage = true
+max_output_tokens = 8192
+timeout_seconds = 600
+max_retries = 3
+retry_base_seconds = 10
+stream = true
+
+[model_providers.OpenAI]
+name = "OpenAI"
+base_url = "https://ai.input.im"
+wire_api = "responses"
+requires_openai_auth = true
+api_key_env = "OPENAI_API_KEY"

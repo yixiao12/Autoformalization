@@ -1,0 +1,982 @@
+<LEVEL_1_GENERATOR_INSTRUCTION>
+You are a Cedar policy compiler.
+Translate the grounded natural-language requirements into a complete Cedar policy set.
+
+Non-negotiable constraints:
+1. Use only entities, actions, context fields, and types declared in CEDAR_SCHEMA.
+2. Do not invent tools, fields, state, or exceptions.
+3. Guard optional fields with `has` before reading them.
+4. Add a unique @id annotation and an exact @source annotation to every policy.
+5. Include default permit policies for Prompt, PreToolUse, and ToolOutput; forbids override them.
+6. Report requirements that cannot be expressed instead of guessing.
+7. Return JSON only, using the output contract at the end of this prompt.
+8. Prefer trusted `context.normalized` fields over raw-string `like` patterns.
+9. Annotate the three default permit policies with @source("infrastructure").
+10. Return top-level Cedar policies only; never wrap policies in a `namespace` block.
+11. Use fully qualified action names exactly as shown in CEDAR_SCHEMA, for example
+    `coding_agent::Action::"PreToolUse"`, not unqualified `Action::"PreToolUse"`.
+</LEVEL_1_GENERATOR_INSTRUCTION>
+
+<LEVEL_2_SYSTEM_PROMPT>
+You are a helpful coding assistant with access to file operations, shell commands, and web search. Use Read before Edit to understand file contents. Prefer Edit over Write for modifying existing files.
+
+
+</LEVEL_2_SYSTEM_PROMPT>
+
+<LEVEL_3_TOOL_DEFINITIONS>
+[
+  {
+    "name": "Read",
+    "description": "Read the contents of a file from the filesystem",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "The absolute path to the file to read"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Line number to start reading from"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Number of lines to read"
+        }
+      },
+      "required": [
+        "file_path"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "The file contents with line numbers"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the operation succeeded"
+        }
+      }
+    }
+  },
+  {
+    "name": "Write",
+    "description": "Write or overwrite a file with new content",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "The absolute path to the file to write"
+        },
+        "content": {
+          "type": "string",
+          "description": "The content to write to the file"
+        }
+      },
+      "required": [
+        "file_path",
+        "content"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the write succeeded"
+        }
+      }
+    }
+  },
+  {
+    "name": "Edit",
+    "description": "Make targeted edits to a file by replacing exact string matches",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "The absolute path to the file to modify"
+        },
+        "old_string": {
+          "type": "string",
+          "description": "The exact text to find and replace"
+        },
+        "new_string": {
+          "type": "string",
+          "description": "The new text to replace with"
+        },
+        "replace_all": {
+          "type": "boolean",
+          "description": "Replace all occurrences",
+          "default": false
+        }
+      },
+      "required": [
+        "file_path",
+        "old_string",
+        "new_string"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the edit succeeded"
+        },
+        "replacements": {
+          "type": "integer",
+          "description": "Number of replacements made"
+        }
+      }
+    }
+  },
+  {
+    "name": "Grep",
+    "description": "Search for patterns in file contents using regular expressions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "The regular expression pattern to search for"
+        },
+        "path": {
+          "type": "string",
+          "description": "File or directory to search in"
+        },
+        "glob": {
+          "type": "string",
+          "description": "Glob pattern to filter files"
+        },
+        "case_insensitive": {
+          "type": "boolean",
+          "description": "Case insensitive search",
+          "default": false
+        },
+        "output_mode": {
+          "type": "string",
+          "enum": [
+            "content",
+            "files_with_matches",
+            "count"
+          ],
+          "default": "files_with_matches"
+        }
+      },
+      "required": [
+        "pattern"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Matching lines or file paths"
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of matches"
+        }
+      }
+    }
+  },
+  {
+    "name": "Glob",
+    "description": "Find files matching a glob pattern",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "The glob pattern to match"
+        },
+        "path": {
+          "type": "string",
+          "description": "Directory to search in"
+        }
+      },
+      "required": [
+        "pattern"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of matching file paths"
+        }
+      }
+    }
+  },
+  {
+    "name": "Bash",
+    "description": "Execute a shell command in a persistent session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The shell command to execute"
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Timeout in milliseconds",
+          "default": 120000,
+          "maximum": 600000
+        }
+      },
+      "required": [
+        "command"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "stdout": {
+          "type": "string",
+          "description": "Standard output from the command"
+        },
+        "stderr": {
+          "type": "string",
+          "description": "Standard error from the command"
+        },
+        "exit_code": {
+          "type": "integer",
+          "description": "Exit code of the command"
+        }
+      }
+    }
+  },
+  {
+    "name": "WebFetch",
+    "description": "Fetch content from a URL and process it with AI",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL to fetch content from"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "The prompt describing what information to extract"
+        }
+      },
+      "required": [
+        "url",
+        "prompt"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "The processed content from the URL"
+        }
+      }
+    }
+  },
+  {
+    "name": "WebSearch",
+    "description": "Search the web with optional domain filtering",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The search query",
+          "minLength": 2
+        },
+        "allowed_domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only include results from these domains"
+        },
+        "blocked_domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Exclude results from these domains"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "snippet": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Search results"
+        }
+      }
+    }
+  }
+]
+</LEVEL_3_TOOL_DEFINITIONS>
+
+<LEVEL_4_CEDAR_SCHEMA>
+namespace coding_agent {
+  entity Agent = {
+    name: __cedar::String,
+    provider: __cedar::String,
+    tools: Set<Tool>
+  };
+
+  entity Message in [Trajectory] = {
+    content: __cedar::String,
+    role: Role
+  };
+
+  entity Role enum ["user", "model", "system", "tool"];
+
+  entity Tool in [Trajectory] = {
+    description: __cedar::String,
+    name: __cedar::String
+  };
+
+  entity Trajectory = {
+    step_count: __cedar::Long
+  };
+
+  action "PreToolUse" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: {
+      arguments: __cedar::String,
+      normalized?: {
+        command_present: Bool,
+        content_has_private_key_header: Bool,
+        content_has_secret_assignment: Bool,
+        content_present: Bool,
+        glob_enumerates_sensitive_directory: Bool,
+        parse_ok: Bool,
+        path_basename: __cedar::String,
+        path_contains_env: Bool,
+        path_has_credentials_component: Bool,
+        path_has_secrets_component: Bool,
+        path_is_aws_credentials: Bool,
+        path_is_env_file: Bool,
+        path_is_pem_file: Bool,
+        path_is_private_key: Bool,
+        path_is_sensitive_directory: Bool,
+        path_normalized: __cedar::String,
+        path_present: Bool,
+        path_segments: Set<__cedar::String>,
+        path_suffix: __cedar::String,
+        search_is_credential_hunting: Bool,
+        search_normalized: __cedar::String,
+        search_present: Bool,
+        search_targets_private_key: Bool,
+        search_targets_secret_assignment: Bool,
+        shell_deletes_root_or_home: Bool,
+        shell_downloads_to_shell: Bool,
+        shell_executables: Set<__cedar::String>,
+        shell_formats_device: Bool,
+        shell_invokes_shutdown: Bool,
+        shell_parse_ok: Bool,
+        shell_uses_privilege_escalation: Bool,
+        shell_writes_block_device: Bool,
+        url_host: __cedar::String,
+        url_host_suffixes: Set<__cedar::String>,
+        url_is_https: Bool,
+        url_parse_ok: Bool,
+        url_present: Bool,
+        url_scheme: __cedar::String
+      },
+      parameters?: {
+        allowed_domains?: Set<__cedar::String>,
+        blocked_domains?: Set<__cedar::String>,
+        case_insensitive?: __cedar::Bool,
+        command?: __cedar::String,
+        content?: __cedar::String,
+        file_path?: __cedar::String,
+        glob?: __cedar::String,
+        limit?: __cedar::Long,
+        new_string?: __cedar::String,
+        offset?: __cedar::Long,
+        old_string?: __cedar::String,
+        output_mode?: __cedar::String,
+        path?: __cedar::String,
+        pattern?: __cedar::String,
+        prompt?: __cedar::String,
+        query?: __cedar::String,
+        replace_all?: __cedar::Bool,
+        timeout?: __cedar::Long,
+        url?: __cedar::String
+      },
+      tool: __cedar::String
+    }
+  };
+
+  action "Prompt" appliesTo {
+    principal: [Agent],
+    resource: [Message],
+    context: {}
+  };
+
+  action "ToolOutput" appliesTo {
+    principal: [Agent],
+    resource: [Trajectory],
+    context: {
+      content: __cedar::String,
+      response?: {
+        content?: __cedar::String,
+        count?: __cedar::Long,
+        exit_code?: __cedar::Long,
+        files?: Set<__cedar::String>,
+        matches?: Set<__cedar::String>,
+        replacements?: __cedar::Long,
+        results?: Set<{
+          snippet?: __cedar::String,
+          title?: __cedar::String,
+          url?: __cedar::String
+        }>,
+        stderr?: __cedar::String,
+        stdout?: __cedar::String,
+        success?: __cedar::Bool
+      }
+    }
+  };
+}
+
+</LEVEL_4_CEDAR_SCHEMA>
+
+<LEVEL_4_NORMALIZED_CONTEXT_SEMANTICS>
+The optional `context.normalized` record is produced
+by trusted deterministic code before Cedar evaluation. Prefer its exact booleans,
+sets, and normalized components over `like` matching on raw strings. In particular:
+- path_* fields distinguish exact filenames/components from incidental substrings;
+- shell_* fields come from shell tokenization and command/pipeline structure;
+- url_* fields use lowercase IDNA hosts and exact domain suffix components;
+- search_* and content_* fields identify assignment/header intent.
+Guard access with `context has normalized`. If a critical decision requires parsing,
+also require the corresponding *_parse_ok field. Raw fields remain available only
+for requirements not represented by normalized fields.
+</LEVEL_4_NORMALIZED_CONTEXT_SEMANTICS>
+
+<LEVEL_5_NATURAL_LANGUAGE_POLICY>
+# Code Agent Safety Policy
+
+Each numbered statement is an atomic requirement. A generated Cedar policy
+must preserve the requirement ID in its `@source` annotation.
+
+1. **CAG-001 — Sensitive writes.** The agent must not use `Write` on paths containing `.env`, `credentials`, or `secrets`.
+2. **CAG-002 — Sensitive edits.** The agent must not use `Edit` on `.env`, `id_rsa`, or `.pem` files.
+3. **CAG-003 — Git metadata integrity.** The agent must not use `Write` or `Edit` on files under a `.git` directory.
+4. **CAG-004 — Sensitive reads.** The agent must not use `Read` on `.env` files, SSH private keys, PEM files, or AWS credential files.
+5. **CAG-005 — Secret-oriented search.** The agent must not use `Grep` to search for private-key headers, `API_KEY=`, or `password=` assignments.
+6. **CAG-006 — Sensitive directory discovery.** The agent must not use `Glob` to enumerate `.ssh`, `.aws`, or `.git` directory contents.
+7. **CAG-007 — Private-key creation.** The agent must not write content containing a private-key header.
+8. **CAG-008 — Secret insertion.** The agent must not edit a file by inserting a private-key header, `AWS_SECRET_ACCESS_KEY`, or `API_KEY=` assignment.
+9. **CAG-009 — Destructive deletion.** The agent must not execute commands that recursively force-delete the filesystem root or the current user's home directory.
+10. **CAG-010 — Disk destruction.** The agent must not execute filesystem-formatting commands or overwrite a disk with data from `/dev/zero`.
+11. **CAG-011 — Raw-device redirection.** The agent must not redirect command output into `/dev/sd*` block devices.
+12. **CAG-012 — Host shutdown.** The agent must not execute `shutdown`, `reboot`, `poweroff`, or `halt` commands.
+13. **CAG-013 — Privilege escalation.** The agent must not execute commands through `sudo` or switch to a root shell with `su -`.
+14. **CAG-014 — Remote script execution.** The agent must not pipe content downloaded by `curl` or `wget` directly into a shell.
+15. **CAG-015 — Command timeout.** A `Bash` timeout must not exceed 300000 milliseconds.
+16. **CAG-016 — Secure web transport.** `WebFetch` may only fetch HTTPS URLs.
+17. **CAG-017 — Untrusted fetch sources.** `WebFetch` must not fetch from Pastebin, raw GitHub content, or GitHub Gists.
+18. **CAG-018 — Credential-hunting searches.** `WebSearch` must not search for password dumps, leaked credentials, or exposed API keys.
+19. **CAG-019 — Private-key output.** Tool output containing a private-key header must be denied.
+20. **CAG-020 — Cloud-secret output.** Tool output containing `AWS_SECRET_ACCESS_KEY` or `SECRET_TOKEN=` must be denied.
+
+
+</LEVEL_5_NATURAL_LANGUAGE_POLICY>
+
+<LEVEL_5_REQUIREMENT_IR>
+[
+  {
+    "id": "CAG-001",
+    "source": "policy.md#CAG-001",
+    "effect": "forbid",
+    "text": "The agent must not use Write on paths containing .env, credentials, or secrets.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Write"
+    ],
+    "required_context": [
+      "parameters.file_path"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-002",
+    "source": "policy.md#CAG-002",
+    "effect": "forbid",
+    "text": "The agent must not use Edit on .env, id_rsa, or .pem files.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Edit"
+    ],
+    "required_context": [
+      "parameters.file_path"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-003",
+    "source": "policy.md#CAG-003",
+    "effect": "forbid",
+    "text": "The agent must not use Write or Edit on files under a .git directory.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Write",
+      "Edit"
+    ],
+    "required_context": [
+      "parameters.file_path"
+    ],
+    "severity": "high",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-004",
+    "source": "policy.md#CAG-004",
+    "effect": "forbid",
+    "text": "The agent must not read environment files, SSH private keys, PEM files, or AWS credential files.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Read"
+    ],
+    "required_context": [
+      "parameters.file_path"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-005",
+    "source": "policy.md#CAG-005",
+    "effect": "forbid",
+    "text": "The agent must not search for private-key headers, API_KEY assignments, or password assignments.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Grep"
+    ],
+    "required_context": [
+      "parameters.pattern"
+    ],
+    "severity": "high",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-006",
+    "source": "policy.md#CAG-006",
+    "effect": "forbid",
+    "text": "The agent must not enumerate .ssh, .aws, or .git directory contents.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Glob"
+    ],
+    "required_context": [
+      "parameters.pattern"
+    ],
+    "severity": "high",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-007",
+    "source": "policy.md#CAG-007",
+    "effect": "forbid",
+    "text": "The agent must not write content containing a private-key header.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Write"
+    ],
+    "required_context": [
+      "parameters.content"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-008",
+    "source": "policy.md#CAG-008",
+    "effect": "forbid",
+    "text": "The agent must not insert private-key headers, AWS secrets, or API_KEY assignments while editing.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Edit"
+    ],
+    "required_context": [
+      "parameters.new_string"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-009",
+    "source": "policy.md#CAG-009",
+    "effect": "forbid",
+    "text": "The agent must not recursively force-delete the filesystem root or current user's home directory.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Bash"
+    ],
+    "required_context": [
+      "parameters.command"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-010",
+    "source": "policy.md#CAG-010",
+    "effect": "forbid",
+    "text": "The agent must not format filesystems or overwrite disks with data from /dev/zero.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Bash"
+    ],
+    "required_context": [
+      "parameters.command"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-011",
+    "source": "policy.md#CAG-011",
+    "effect": "forbid",
+    "text": "The agent must not redirect command output into /dev/sd block devices.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Bash"
+    ],
+    "required_context": [
+      "parameters.command"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-012",
+    "source": "policy.md#CAG-012",
+    "effect": "forbid",
+    "text": "The agent must not execute shutdown, reboot, poweroff, or halt commands.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Bash"
+    ],
+    "required_context": [
+      "parameters.command"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-013",
+    "source": "policy.md#CAG-013",
+    "effect": "forbid",
+    "text": "The agent must not execute commands through sudo or switch to a root shell with su -.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Bash"
+    ],
+    "required_context": [
+      "parameters.command"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-014",
+    "source": "policy.md#CAG-014",
+    "effect": "forbid",
+    "text": "The agent must not pipe content downloaded by curl or wget directly into a shell.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Bash"
+    ],
+    "required_context": [
+      "parameters.command"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-015",
+    "source": "policy.md#CAG-015",
+    "effect": "forbid",
+    "text": "A Bash timeout must not exceed 300000 milliseconds.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "Bash"
+    ],
+    "required_context": [
+      "parameters.timeout"
+    ],
+    "severity": "medium",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-016",
+    "source": "policy.md#CAG-016",
+    "effect": "forbid",
+    "text": "WebFetch may only fetch HTTPS URLs.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "WebFetch"
+    ],
+    "required_context": [
+      "parameters.url"
+    ],
+    "severity": "high",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-017",
+    "source": "policy.md#CAG-017",
+    "effect": "forbid",
+    "text": "WebFetch must not fetch from Pastebin, raw GitHub content, or GitHub Gists.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "WebFetch"
+    ],
+    "required_context": [
+      "parameters.url"
+    ],
+    "severity": "high",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-018",
+    "source": "policy.md#CAG-018",
+    "effect": "forbid",
+    "text": "WebSearch must not search for password dumps, leaked credentials, or exposed API keys.",
+    "target_stages": [
+      "PreToolUse"
+    ],
+    "target_tools": [
+      "WebSearch"
+    ],
+    "required_context": [
+      "parameters.query"
+    ],
+    "severity": "high",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-019",
+    "source": "policy.md#CAG-019",
+    "effect": "forbid",
+    "text": "Tool output containing a private-key header must be denied.",
+    "target_stages": [
+      "ToolOutput"
+    ],
+    "target_tools": [
+      "*"
+    ],
+    "required_context": [
+      "content"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  },
+  {
+    "id": "CAG-020",
+    "source": "policy.md#CAG-020",
+    "effect": "forbid",
+    "text": "Tool output containing AWS_SECRET_ACCESS_KEY or SECRET_TOKEN assignments must be denied.",
+    "target_stages": [
+      "ToolOutput"
+    ],
+    "target_tools": [
+      "*"
+    ],
+    "required_context": [
+      "content"
+    ],
+    "severity": "critical",
+    "enforceability": "direct"
+  }
+]
+</LEVEL_5_REQUIREMENT_IR>
+
+<LEVEL_6_REPAIR_CONTEXT round="2">
+<PREVIOUS_CANDIDATE>
+{
+  "policies": "@id(\"default-permit-prompt\")\n@source(\"infrastructure\")\npermit(\n  principal,\n  action == coding_agent::Action::\"Prompt\",\n  resource\n);\n\n@id(\"default-permit-pretooluse\")\n@source(\"infrastructure\")\npermit(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n);\n\n@id(\"default-permit-tooloutput\")\n@source(\"infrastructure\")\npermit(\n  principal,\n  action == coding_agent::Action::\"ToolOutput\",\n  resource\n);\n\n@id(\"forbid-cag-001-sensitive-writes\")\n@source(\"policy.md#CAG-001\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Write\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.path_present &&\n  (\n    context.normalized.path_contains_env ||\n    context.normalized.path_has_credentials_component ||\n    context.normalized.path_has_secrets_component\n  )\n};\n\n@id(\"forbid-cag-002-sensitive-edits\")\n@source(\"policy.md#CAG-002\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Edit\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.path_present &&\n  (\n    context.normalized.path_is_env_file ||\n    context.normalized.path_basename == \"id_rsa\" ||\n    context.normalized.path_is_pem_file\n  )\n};\n\n@id(\"forbid-cag-003-git-metadata-integrity\")\n@source(\"policy.md#CAG-003\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  (resource.name == \"Write\" || resource.name == \"Edit\") &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.path_present &&\n  context.normalized.path_segments.contains(\".git\")\n};\n\n@id(\"forbid-cag-004-sensitive-reads\")\n@source(\"policy.md#CAG-004\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Read\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.path_present &&\n  (\n    context.normalized.path_is_env_file ||\n    context.normalized.path_is_private_key ||\n    context.normalized.path_is_pem_file ||\n    context.normalized.path_is_aws_credentials\n  )\n};\n\n@id(\"forbid-cag-005-secret-oriented-search\")\n@source(\"policy.md#CAG-005\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Grep\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.search_present &&\n  (\n    context.normalized.search_targets_private_key ||\n    context.normalized.search_targets_secret_assignment\n  )\n};\n\n@id(\"forbid-cag-006-sensitive-directory-discovery\")\n@source(\"policy.md#CAG-006\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Glob\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.glob_enumerates_sensitive_directory\n};\n\n@id(\"forbid-cag-007-private-key-creation\")\n@source(\"policy.md#CAG-007\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Write\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.content_present &&\n  context.normalized.content_has_private_key_header\n};\n\n@id(\"forbid-cag-008-secret-insertion\")\n@source(\"policy.md#CAG-008\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Edit\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.content_present &&\n  (\n    context.normalized.content_has_private_key_header ||\n    context.normalized.content_has_secret_assignment\n  )\n};\n\n@id(\"forbid-cag-009-destructive-deletion\")\n@source(\"policy.md#CAG-009\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Bash\" &&\n  context has normalized &&\n  context.normalized.shell_parse_ok &&\n  context.normalized.command_present &&\n  context.normalized.shell_deletes_root_or_home\n};\n\n@id(\"forbid-cag-010-disk-destruction\")\n@source(\"policy.md#CAG-010\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Bash\" &&\n  context has normalized &&\n  context.normalized.shell_parse_ok &&\n  context.normalized.command_present &&\n  (\n    context.normalized.shell_formats_device ||\n    context.normalized.shell_writes_block_device\n  )\n};\n\n@id(\"forbid-cag-011-raw-device-redirection\")\n@source(\"policy.md#CAG-011\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Bash\" &&\n  context has normalized &&\n  context.normalized.shell_parse_ok &&\n  context.normalized.command_present &&\n  context.normalized.shell_writes_block_device\n};\n\n@id(\"forbid-cag-012-host-shutdown\")\n@source(\"policy.md#CAG-012\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Bash\" &&\n  context has normalized &&\n  context.normalized.shell_parse_ok &&\n  context.normalized.command_present &&\n  context.normalized.shell_invokes_shutdown\n};\n\n@id(\"forbid-cag-013-privilege-escalation\")\n@source(\"policy.md#CAG-013\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Bash\" &&\n  context has normalized &&\n  context.normalized.shell_parse_ok &&\n  context.normalized.command_present &&\n  context.normalized.shell_uses_privilege_escalation\n};\n\n@id(\"forbid-cag-014-remote-script-execution\")\n@source(\"policy.md#CAG-014\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Bash\" &&\n  context has normalized &&\n  context.normalized.shell_parse_ok &&\n  context.normalized.command_present &&\n  context.normalized.shell_downloads_to_shell\n};\n\n@id(\"forbid-cag-015-command-timeout\")\n@source(\"policy.md#CAG-015\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"Bash\" &&\n  context has parameters &&\n  context.parameters has timeout &&\n  context.parameters.timeout > 300000\n};\n\n@id(\"forbid-cag-016-secure-web-transport\")\n@source(\"policy.md#CAG-016\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"WebFetch\" &&\n  context has normalized &&\n  context.normalized.url_parse_ok &&\n  context.normalized.url_present &&\n  !context.normalized.url_is_https\n};\n\n@id(\"forbid-cag-017-untrusted-fetch-sources\")\n@source(\"policy.md#CAG-017\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"WebFetch\" &&\n  context has normalized &&\n  context.normalized.url_parse_ok &&\n  context.normalized.url_present &&\n  (\n    context.normalized.url_host_suffixes.contains(\"pastebin.com\") ||\n    context.normalized.url_host_suffixes.contains(\"raw.githubusercontent.com\") ||\n    context.normalized.url_host_suffixes.contains(\"gist.github.com\") ||\n    context.normalized.url_host_suffixes.contains(\"gist.githubusercontent.com\")\n  )\n};\n\n@id(\"forbid-cag-018-credential-hunting-searches\")\n@source(\"policy.md#CAG-018\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"PreToolUse\",\n  resource\n)\nwhen {\n  resource.name == \"WebSearch\" &&\n  context has normalized &&\n  context.normalized.parse_ok &&\n  context.normalized.search_present &&\n  context.normalized.search_is_credential_hunting\n};\n\n@id(\"forbid-cag-019-private-key-output\")\n@source(\"policy.md#CAG-019\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"ToolOutput\",\n  resource\n)\nwhen {\n  context.content like \"*-----BEGIN *PRIVATE KEY-----*\"\n};\n\n@id(\"forbid-cag-020-cloud-secret-output\")\n@source(\"policy.md#CAG-020\")\nforbid(\n  principal,\n  action == coding_agent::Action::\"ToolOutput\",\n  resource\n)\nwhen {\n  context.content like \"*AWS_SECRET_ACCESS_KEY*\" ||\n  context.content like \"*SECRET_TOKEN=*\"\n};",
+  "requirement_mapping": {
+    "CAG-001": [
+      "forbid-cag-001-sensitive-writes"
+    ],
+    "CAG-002": [
+      "forbid-cag-002-sensitive-edits"
+    ],
+    "CAG-003": [
+      "forbid-cag-003-git-metadata-integrity"
+    ],
+    "CAG-004": [
+      "forbid-cag-004-sensitive-reads"
+    ],
+    "CAG-005": [
+      "forbid-cag-005-secret-oriented-search"
+    ],
+    "CAG-006": [
+      "forbid-cag-006-sensitive-directory-discovery"
+    ],
+    "CAG-007": [
+      "forbid-cag-007-private-key-creation"
+    ],
+    "CAG-008": [
+      "forbid-cag-008-secret-insertion"
+    ],
+    "CAG-009": [
+      "forbid-cag-009-destructive-deletion"
+    ],
+    "CAG-010": [
+      "forbid-cag-010-disk-destruction"
+    ],
+    "CAG-011": [
+      "forbid-cag-011-raw-device-redirection"
+    ],
+    "CAG-012": [
+      "forbid-cag-012-host-shutdown"
+    ],
+    "CAG-013": [
+      "forbid-cag-013-privilege-escalation"
+    ],
+    "CAG-014": [
+      "forbid-cag-014-remote-script-execution"
+    ],
+    "CAG-015": [
+      "forbid-cag-015-command-timeout"
+    ],
+    "CAG-016": [
+      "forbid-cag-016-secure-web-transport"
+    ],
+    "CAG-017": [
+      "forbid-cag-017-untrusted-fetch-sources"
+    ],
+    "CAG-018": [
+      "forbid-cag-018-credential-hunting-searches"
+    ],
+    "CAG-019": [
+      "forbid-cag-019-private-key-output"
+    ],
+    "CAG-020": [
+      "forbid-cag-020-cloud-secret-output"
+    ]
+  },
+  "unsupported_requirements": [],
+  "assumptions": [
+    "The trusted normalized content fields for Edit evaluate the inserted replacement text, corresponding to parameters.new_string.",
+    "context.normalized.content_has_secret_assignment covers AWS_SECRET_ACCESS_KEY, API_KEY=, password=, and SECRET_TOKEN= assignment intent where applicable.",
+    "context.normalized.shell_writes_block_device covers both overwriting disks with /dev/zero and redirects to /dev/sd* block devices.",
+    "context.normalized.glob_enumerates_sensitive_directory covers .ssh, .aws, and .git directory enumeration."
+  ],
+  "changes": []
+}
+</PREVIOUS_CANDIDATE>
+<HARD_FEEDBACK>
+Hard evaluation passed.
+</HARD_FEEDBACK>
+<VERIFIED_SOFT_FEEDBACK>
+[
+  {
+    "finding_id": "F-001",
+    "requirement_id": "CAG-001",
+    "finding_type": "under_constraint",
+    "severity": "critical",
+    "source_evidence": "CAG-001: The agent must not use Write on paths containing .env, credentials, or secrets.",
+    "cedar_evidence": "The Cedar condition checks path_contains_env, path_has_credentials_component, or path_has_secrets_component. The normalized semantics distinguish exact filenames/components from incidental substrings.",
+    "counterexample": "A Write to /tmp/mycredentials.txt contains the string credentials in the path, but it is not necessarily a credentials path component.",
+    "suggestion": "Represent the source's substring requirement for credentials and secrets, or change the source/atomic requirement if exact path components were intended.",
+    "dimension": "condition_completeness",
+    "counterexample_case": {
+      "stage": "PreToolUse",
+      "tool": "Write",
+      "expected": "DENY",
+      "arguments": {
+        "file_path": "/tmp/mycredentials.txt",
+        "content": "nonsecret test content"
+      },
+      "output": null
+    }
+  }
+]
+</VERIFIED_SOFT_FEEDBACK>
+</LEVEL_6_REPAIR_CONTEXT>
+
+<LEVEL_7_OUTPUT_CONTRACT>
+{
+  "policies": "complete Cedar policy set",
+  "requirement_mapping": {"requirement-id": ["policy-id"]},
+  "unsupported_requirements": [],
+  "assumptions": [],
+  "changes": []
+}
+</LEVEL_7_OUTPUT_CONTRACT>

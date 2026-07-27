@@ -1,0 +1,172 @@
+{
+  "agent_id": "coding_agent",
+  "tools": [
+    {
+      "name": "Read",
+      "description": "Read the contents of a file from the filesystem",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_path": {"type": "string", "description": "The absolute path to the file to read"},
+          "offset": {"type": "integer", "description": "Line number to start reading from"},
+          "limit": {"type": "integer", "description": "Number of lines to read"}
+        },
+        "required": ["file_path"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {"type": "string", "description": "The file contents with line numbers"},
+          "success": {"type": "boolean", "description": "Whether the operation succeeded"}
+        }
+      }
+    },
+    {
+      "name": "Write",
+      "description": "Write or overwrite a file with new content",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_path": {"type": "string", "description": "The absolute path to the file to write"},
+          "content": {"type": "string", "description": "The content to write to the file"}
+        },
+        "required": ["file_path", "content"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "description": "Whether the write succeeded"}
+        }
+      }
+    },
+    {
+      "name": "Edit",
+      "description": "Make targeted edits to a file by replacing exact string matches",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_path": {"type": "string", "description": "The absolute path to the file to modify"},
+          "old_string": {"type": "string", "description": "The exact text to find and replace"},
+          "new_string": {"type": "string", "description": "The new text to replace with"},
+          "replace_all": {"type": "boolean", "description": "Replace all occurrences", "default": false}
+        },
+        "required": ["file_path", "old_string", "new_string"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "description": "Whether the edit succeeded"},
+          "replacements": {"type": "integer", "description": "Number of replacements made"}
+        }
+      }
+    },
+    {
+      "name": "Grep",
+      "description": "Search for patterns in file contents using regular expressions",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {"type": "string", "description": "The regular expression pattern to search for"},
+          "path": {"type": "string", "description": "File or directory to search in"},
+          "glob": {"type": "string", "description": "Glob pattern to filter files"},
+          "case_insensitive": {"type": "boolean", "description": "Case insensitive search", "default": false},
+          "output_mode": {"type": "string", "enum": ["content", "files_with_matches", "count"], "default": "files_with_matches"}
+        },
+        "required": ["pattern"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matches": {"type": "array", "items": {"type": "string"}, "description": "Matching lines or file paths"},
+          "count": {"type": "integer", "description": "Number of matches"}
+        }
+      }
+    },
+    {
+      "name": "Glob",
+      "description": "Find files matching a glob pattern",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {"type": "string", "description": "The glob pattern to match"},
+          "path": {"type": "string", "description": "Directory to search in"}
+        },
+        "required": ["pattern"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {"type": "array", "items": {"type": "string"}, "description": "List of matching file paths"}
+        }
+      }
+    },
+    {
+      "name": "Bash",
+      "description": "Execute a shell command in a persistent session",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {"type": "string", "description": "The shell command to execute"},
+          "timeout": {"type": "integer", "description": "Timeout in milliseconds", "default": 120000, "maximum": 600000}
+        },
+        "required": ["command"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stdout": {"type": "string", "description": "Standard output from the command"},
+          "stderr": {"type": "string", "description": "Standard error from the command"},
+          "exit_code": {"type": "integer", "description": "Exit code of the command"}
+        }
+      }
+    },
+    {
+      "name": "WebFetch",
+      "description": "Fetch content from a URL and process it with AI",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "format": "uri", "description": "The URL to fetch content from"},
+          "prompt": {"type": "string", "description": "The prompt describing what information to extract"}
+        },
+        "required": ["url", "prompt"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {"type": "string", "description": "The processed content from the URL"}
+        }
+      }
+    },
+    {
+      "name": "WebSearch",
+      "description": "Search the web with optional domain filtering",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "The search query", "minLength": 2},
+          "allowed_domains": {"type": "array", "items": {"type": "string"}, "description": "Only include results from these domains"},
+          "blocked_domains": {"type": "array", "items": {"type": "string"}, "description": "Exclude results from these domains"}
+        },
+        "required": ["query"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {"type": "string"},
+                "url": {"type": "string"},
+                "snippet": {"type": "string"}
+              }
+            },
+            "description": "Search results"
+          }
+        }
+      }
+    }
+  ]
+}

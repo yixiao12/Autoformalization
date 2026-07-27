@@ -1,0 +1,467 @@
+{
+  "tools": [
+    {
+      "name": "get_request",
+      "description": "Make a GET request to the specified URL.\n\nReturns:\n    dict: The JSON response from the server.\nRaises:\n    HTTPError: If the server returns an error response.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "post_request",
+      "description": "Make a POST request to the specified URL with the given payload.\n\nReturns:\n    str: A success message if the request was successful.\n\nRaises:\n    ValueError: If the payload is not a valid JSON string.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "string",
+            "description": "the payload to be sent in the POST request"
+          }
+        },
+        "required": [
+          "url",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "get_patient",
+      "description": "Search for patients in the FHIR server based on various criteria.\n\nReturns:\n    A list of Patient objects matching the search criteria.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "description": "The patient's Medical Record Number (MRN)."
+          },
+          "birthdate": {
+            "type": "string",
+            "description": "The patient’s birthdate as a single date (YYYY-MM-DD)"
+          },
+          "family": {
+            "type": "string",
+            "description": "The patient's family name."
+          },
+          "given": {
+            "type": "string",
+            "description": "The patient's given name. May include first and middle names."
+          },
+          "name": {
+            "type": "string",
+            "description": "Family or given name, but not the full name. When discrete name parameters are used, such as 'family' or 'given', this parameter is ignored."
+          },
+          "gender": {
+            "type": "string",
+            "description": "The patient's legal sex."
+          },
+          "address": {
+            "type": "string",
+            "description": "Any part of the patient's address, including street, city, state, and postal code."
+          },
+          "address_city": {
+            "type": "string",
+            "description": "The city of the patient's address."
+          },
+          "address_postalcode": {
+            "type": "string",
+            "description": "The postal code of the patient's address."
+          },
+          "address_state": {
+            "type": "string",
+            "description": "The state of the patient's address."
+          },
+          "telecom": {
+            "type": "string",
+            "description": "The patient's phone number (XXX-XXX-XXXX) or email address."
+          },
+          "_offset": {
+            "type": "integer",
+            "description": "Number of results to skip."
+          },
+          "_sort": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "The purpose of retrieving the patient information. Could be 'patient care', 'research', 'employment screening', or other purposes."
+          },
+          "require_identifier": {
+            "type": "boolean",
+            "description": "The flag to indicate whether personal identifier (e.g., address, telecom) is necessary for the task. If personal identifier is not necessary, set this flag to False."
+          }
+        },
+        "required": [
+          "patient_id",
+          "birthdate",
+          "family",
+          "given",
+          "name",
+          "gender",
+          "address",
+          "address_city",
+          "address_postalcode",
+          "address_state",
+          "telecom",
+          "_offset",
+          "_sort",
+          "purpose",
+          "require_identifier"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "get_condition",
+      "description": "Retrieve conditions associated with a specific patient.\n\nReturns:\n    List[Condition]: A list of Condition objects associated with the patient.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "condition_id": {
+            "type": "string",
+            "description": "The unique identifier of the condition."
+          },
+          "patient_id": {
+            "type": "string",
+            "description": "The patient's unique Medical Record Number (MRN)."
+          },
+          "code": {
+            "type": "string",
+            "description": "The icd-10 code of the condition."
+          },
+          "onset_date": {
+            "type": "string",
+            "description": "The date when the condition began, in date time format (YYYY-MM-DDTHH:MM:SS±HH:MM). Can be a specific date or a range."
+          },
+          "recorded_date": {
+            "type": "string",
+            "description": "The date when the condition was recorded, in date time format (YYYY-MM-DDTHH:MM:SS±HH:MM). Can be a specific date or a range."
+          },
+          "_count": {
+            "type": "integer",
+            "description": "Maximum number of results to return."
+          },
+          "_offset": {
+            "type": "integer",
+            "description": "Number of results to skip."
+          },
+          "_sort": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "The purpose of retrieving the condition information. Could be 'patient care', 'research', 'employment screening', or other purposes."
+          }
+        },
+        "required": [
+          "condition_id",
+          "patient_id",
+          "code",
+          "onset_date",
+          "recorded_date",
+          "_count",
+          "_offset",
+          "_sort",
+          "purpose"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "get_observation",
+      "description": "Retrieve observations from the FHIR server.\n\nReturns:\n    List[Observation]: A list of Observation objects.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "description": "The unique identifier of the observation."
+          },
+          "patient_id": {
+            "type": "string",
+            "description": "The patient's unique Medical Record Number (MRN)."
+          },
+          "status": {
+            "type": "string",
+            "description": "The status of the observation (e.g., final, amended)."
+          },
+          "category": {
+            "type": "string",
+            "description": "The category of the observation. Can be 'vital-signs', or 'laboratory'."
+          },
+          "code": {
+            "type": "string",
+            "description": "The code of the observation."
+          },
+          "effective_date": {
+            "type": "string",
+            "description": "The date when the observation was made, in date time format (YYYY-MM-DDTHH:MM:SS±HH:MM). Can be a specific date or a range."
+          },
+          "value_string": {
+            "type": "string",
+            "description": "The value of the observation as a string."
+          },
+          "value_quantity": {
+            "type": "number",
+            "description": "The value of the observation as a quantity."
+          },
+          "_count": {
+            "type": "integer",
+            "description": "Maximum number of results to return."
+          },
+          "_offset": {
+            "type": "integer",
+            "description": "Number of results to skip."
+          },
+          "_sort": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "The purpose of retrieving the observation information. Could be 'patient care', 'research', 'employment screening', or other purposes."
+          }
+        },
+        "required": [
+          "observation_id",
+          "patient_id",
+          "status",
+          "category",
+          "code",
+          "effective_date",
+          "value_string",
+          "value_quantity",
+          "_count",
+          "_offset",
+          "_sort",
+          "purpose"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "get_medication_request",
+      "description": "Retrieve medication requests from the FHIR server.\n\nReturns:\n    List[MedicationRequest]: A list of MedicationRequest objects.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "medication_id": {
+            "type": "string",
+            "description": "The unique identifier of the medication request."
+          },
+          "status": {
+            "type": "string",
+            "description": "The status of the medication request."
+          },
+          "intent": {
+            "type": "string",
+            "description": "The intent of the medication request."
+          },
+          "patient_id": {
+            "type": "string",
+            "description": "The patient's unique Medical Record Number (MRN)."
+          },
+          "authored_on": {
+            "type": "string",
+            "description": "The date when the medication request was authored, in date time format (YYYY-MM-DDTHH:MM:SS±HH:MM). Can be a specific date or a range."
+          },
+          "_count": {
+            "type": "integer",
+            "description": "Maximum number of results to return."
+          },
+          "_offset": {
+            "type": "integer",
+            "description": "Number of results to skip."
+          },
+          "_sort": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "The purpose of retrieving the medication request information. Could be 'patient care', 'research', 'employment screening', or other purposes."
+          }
+        },
+        "required": [
+          "medication_id",
+          "status",
+          "intent",
+          "patient_id",
+          "authored_on",
+          "_count",
+          "_offset",
+          "_sort",
+          "purpose"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "get_procedure",
+      "description": "Retrieve procedures from the FHIR server.\n\nReturns:\n    List[Procedure]: A list of Procedure objects.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "procedure_id": {
+            "type": "string",
+            "description": "The unique identifier of the procedure."
+          },
+          "patient_id": {
+            "type": "string",
+            "description": "The patient's unique Medical Record Number (MRN)."
+          },
+          "code": {
+            "type": "string",
+            "description": "The code of the procedure, following CPT standards."
+          },
+          "performed_date_time": {
+            "type": "string",
+            "description": "The date when the procedure was performed, in date time format (YYYY-MM-DDTHH:MM:SS±HH:MM). Can be a specific date or a range."
+          },
+          "_count": {
+            "type": "integer",
+            "description": "Maximum number of results to return."
+          },
+          "_offset": {
+            "type": "integer",
+            "description": "Number of results to skip."
+          },
+          "_sort": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "The purpose of retrieving the procedure information. Could be 'patient care', 'research', 'employment screening', or other purposes."
+          }
+        },
+        "required": [
+          "procedure_id",
+          "patient_id",
+          "code",
+          "performed_date_time",
+          "_count",
+          "_offset",
+          "_sort",
+          "purpose"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "post_observation",
+      "description": "Create a new observation in the FHIR server.\n\nReturns:\n    Observation: The created Observation object.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "observation": {
+            "type": "object",
+            "description": "Structured FHIR value."
+          }
+        },
+        "required": [
+          "observation"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "post_medication_request",
+      "description": "Create a new medication request in the FHIR server.\n\nReturns:\n    MedicationRequest: The created MedicationRequest object.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "medication_request": {
+            "type": "object",
+            "description": "Structured FHIR value."
+          },
+          "explanation_for_no_dosing_instructions": {
+            "type": "string",
+            "description": "If the medication request lacks dosing instructions, provide a justification here."
+          }
+        },
+        "required": [
+          "medication_request",
+          "explanation_for_no_dosing_instructions"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "post_service_request",
+      "description": "Create a new service request in the FHIR server.\n\nReturns:\n    ServiceRequest: The created ServiceRequest object.\nRaises:\n    HTTPError: If the FHIR server returns an error response.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_request": {
+            "type": "object",
+            "description": "Structured FHIR value."
+          }
+        },
+        "required": [
+          "service_request"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Recorded FHIR tool result.",
+        "additionalProperties": true
+      }
+    }
+  ]
+}

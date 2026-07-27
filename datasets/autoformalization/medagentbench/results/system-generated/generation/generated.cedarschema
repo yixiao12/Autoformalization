@@ -1,0 +1,200 @@
+namespace medagentbench_agent {
+  entity Agent = {
+    name: __cedar::String,
+    provider: __cedar::String,
+    tools: Set<Tool>
+  };
+
+  entity Message in [Trajectory] = {
+    content: __cedar::String,
+    role: Role
+  };
+
+  entity Role enum ["user", "model", "system", "tool"];
+
+  entity Tool in [Trajectory] = {
+    description: __cedar::String,
+    name: __cedar::String
+  };
+
+  entity Trajectory = {
+    step_count: __cedar::Long
+  };
+
+  action "PreToolUse" appliesTo {
+    principal: [Agent],
+    resource: [Tool],
+    context: {
+      arguments: __cedar::String,
+      medical?: {
+        authored_on_present: Bool,
+        canonical_tool: __cedar::String,
+        count: __cedar::Long,
+        count_is_narrow: Bool,
+        count_present: Bool,
+        current_patient_id: __cedar::String,
+        dosage_present: Bool,
+        intent: __cedar::String,
+        is_write: Bool,
+        issued_present: Bool,
+        medication_concept_present: Bool,
+        observation_category_display_present: Bool,
+        observation_category_present: Bool,
+        observation_category_system_present: Bool,
+        patient_id_present: Bool,
+        payload_present: Bool,
+        priority: __cedar::String,
+        purpose_is_patient_care: Bool,
+        purpose_present: Bool,
+        query_has_identifier: Bool,
+        query_is_broad: Bool,
+        resource_id_present: Bool,
+        resource_type: __cedar::String,
+        service_request_code_present: Bool,
+        status: __cedar::String,
+        subject_is_patient: Bool,
+        subject_reference_present: Bool
+      },
+      normalized?: {
+        command_present: Bool,
+        content_has_private_key_header: Bool,
+        content_has_secret_assignment: Bool,
+        content_present: Bool,
+        glob_enumerates_sensitive_directory: Bool,
+        parse_ok: Bool,
+        path_basename: __cedar::String,
+        path_contains_env: Bool,
+        path_has_credentials_component: Bool,
+        path_has_secrets_component: Bool,
+        path_is_aws_credentials: Bool,
+        path_is_env_file: Bool,
+        path_is_pem_file: Bool,
+        path_is_private_key: Bool,
+        path_is_sensitive_directory: Bool,
+        path_normalized: __cedar::String,
+        path_present: Bool,
+        path_segments: Set<__cedar::String>,
+        path_suffix: __cedar::String,
+        search_is_credential_hunting: Bool,
+        search_normalized: __cedar::String,
+        search_present: Bool,
+        search_targets_private_key: Bool,
+        search_targets_secret_assignment: Bool,
+        shell_deletes_root_or_home: Bool,
+        shell_downloads_to_shell: Bool,
+        shell_executables: Set<__cedar::String>,
+        shell_formats_device: Bool,
+        shell_invokes_shutdown: Bool,
+        shell_parse_ok: Bool,
+        shell_uses_privilege_escalation: Bool,
+        shell_writes_block_device: Bool,
+        url_host: __cedar::String,
+        url_host_suffixes: Set<__cedar::String>,
+        url_is_https: Bool,
+        url_parse_ok: Bool,
+        url_present: Bool,
+        url_scheme: __cedar::String
+      },
+      parameters?: {
+        _count?: __cedar::Long,
+        _offset?: __cedar::Long,
+        _sort?: __cedar::String,
+        address?: __cedar::String,
+        address_city?: __cedar::String,
+        address_postalcode?: __cedar::String,
+        address_state?: __cedar::String,
+        authored_on?: __cedar::String,
+        birthdate?: __cedar::String,
+        category?: __cedar::String,
+        code?: __cedar::String,
+        condition_id?: __cedar::String,
+        effective_date?: __cedar::String,
+        explanation_for_no_dosing_instructions?: __cedar::String,
+        family?: __cedar::String,
+        gender?: __cedar::String,
+        given?: __cedar::String,
+        intent?: __cedar::String,
+        medication_id?: __cedar::String,
+        medication_request?: {        },
+        name?: __cedar::String,
+        observation?: {        },
+        observation_id?: __cedar::String,
+        onset_date?: __cedar::String,
+        patient_id?: __cedar::String,
+        payload?: __cedar::String,
+        performed_date_time?: __cedar::String,
+        procedure_id?: __cedar::String,
+        purpose?: __cedar::String,
+        recorded_date?: __cedar::String,
+        require_identifier?: __cedar::Bool,
+        service_request?: {        },
+        status?: __cedar::String,
+        telecom?: __cedar::String,
+        url?: __cedar::String,
+        value_quantity?: __cedar::Long,
+        value_string?: __cedar::String
+      },
+      session?: {
+        current_call_is_backdated: Bool,
+        current_call_is_correction: Bool,
+        current_call_is_duplicate: Bool,
+        current_call_patient_mismatch: Bool,
+        current_call_patient_unseen: Bool,
+        current_call_retries_failed_write: Bool,
+        established_patient_id: __cedar::String,
+        failed_post_signatures: Set<__cedar::String>,
+        last_assistant_restated_patient: Bool,
+        last_get_patient_returned_multiple: Bool,
+        last_tool_error: Bool,
+        now_date: __cedar::String,
+        now_timestamp: __cedar::String,
+        pending_write_confirmed: Bool,
+        prior_post_signatures: Set<__cedar::String>,
+        seen_patient_ids: Set<__cedar::String>,
+        user_confirmed_allergy_check: Bool,
+        user_confirmed_write: Bool,
+        user_specified_backdate: Bool,
+        user_specified_correction: Bool,
+        user_specified_urgency: Bool
+      },
+      tool: __cedar::String
+    }
+  };
+
+  action "Prompt" appliesTo {
+    principal: [Agent],
+    resource: [Message],
+    context: {}
+  };
+
+  action "ToolOutput" appliesTo {
+    principal: [Agent],
+    resource: [Trajectory],
+    context: {
+      content: __cedar::String,
+      session?: {
+        current_call_is_backdated: Bool,
+        current_call_is_correction: Bool,
+        current_call_is_duplicate: Bool,
+        current_call_patient_mismatch: Bool,
+        current_call_patient_unseen: Bool,
+        current_call_retries_failed_write: Bool,
+        established_patient_id: __cedar::String,
+        failed_post_signatures: Set<__cedar::String>,
+        last_assistant_restated_patient: Bool,
+        last_get_patient_returned_multiple: Bool,
+        last_tool_error: Bool,
+        now_date: __cedar::String,
+        now_timestamp: __cedar::String,
+        pending_write_confirmed: Bool,
+        prior_post_signatures: Set<__cedar::String>,
+        seen_patient_ids: Set<__cedar::String>,
+        user_confirmed_allergy_check: Bool,
+        user_confirmed_write: Bool,
+        user_specified_backdate: Bool,
+        user_specified_correction: Bool,
+        user_specified_urgency: Bool
+      }
+    }
+  };
+}

@@ -1,0 +1,222 @@
+[
+  {
+    "id": "CAG-001",
+    "source": "policy.md#CAG-001",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Write"],
+    "required_context": ["parameters.file_path"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not use Write on paths containing .env, credentials, or secrets."
+  },
+  {
+    "id": "CAG-002",
+    "source": "policy.md#CAG-002",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Edit"],
+    "required_context": ["parameters.file_path"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not use Edit on .env, id_rsa, or .pem files."
+  },
+  {
+    "id": "CAG-003",
+    "source": "policy.md#CAG-003",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Write", "Edit"],
+    "required_context": ["parameters.file_path"],
+    "severity": "high",
+    "enforceability": "direct",
+    "text": "The agent must not use Write or Edit on files under a .git directory."
+  },
+  {
+    "id": "CAG-004",
+    "source": "policy.md#CAG-004",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Read"],
+    "required_context": ["parameters.file_path"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not read environment files, SSH private keys, PEM files, or AWS credential files."
+  },
+  {
+    "id": "CAG-005",
+    "source": "policy.md#CAG-005",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Grep"],
+    "required_context": ["parameters.pattern"],
+    "severity": "high",
+    "enforceability": "direct",
+    "text": "The agent must not search for private-key headers, API_KEY assignments, or password assignments."
+  },
+  {
+    "id": "CAG-006",
+    "source": "policy.md#CAG-006",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Glob"],
+    "required_context": ["parameters.pattern"],
+    "severity": "high",
+    "enforceability": "direct",
+    "text": "The agent must not enumerate .ssh, .aws, or .git directory contents."
+  },
+  {
+    "id": "CAG-007",
+    "source": "policy.md#CAG-007",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Write"],
+    "required_context": ["parameters.content"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not write content containing a private-key header."
+  },
+  {
+    "id": "CAG-008",
+    "source": "policy.md#CAG-008",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Edit"],
+    "required_context": ["parameters.new_string"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not insert private-key headers, AWS secrets, or API_KEY assignments while editing."
+  },
+  {
+    "id": "CAG-009",
+    "source": "policy.md#CAG-009",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Bash"],
+    "required_context": ["parameters.command"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not recursively force-delete the filesystem root or current user's home directory."
+  },
+  {
+    "id": "CAG-010",
+    "source": "policy.md#CAG-010",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Bash"],
+    "required_context": ["parameters.command"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not format filesystems or overwrite disks with data from /dev/zero."
+  },
+  {
+    "id": "CAG-011",
+    "source": "policy.md#CAG-011",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Bash"],
+    "required_context": ["parameters.command"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not redirect command output into /dev/sd block devices."
+  },
+  {
+    "id": "CAG-012",
+    "source": "policy.md#CAG-012",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Bash"],
+    "required_context": ["parameters.command"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not execute shutdown, reboot, poweroff, or halt commands."
+  },
+  {
+    "id": "CAG-013",
+    "source": "policy.md#CAG-013",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Bash"],
+    "required_context": ["parameters.command"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not execute commands through sudo or switch to a root shell with su -."
+  },
+  {
+    "id": "CAG-014",
+    "source": "policy.md#CAG-014",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Bash"],
+    "required_context": ["parameters.command"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "The agent must not pipe content downloaded by curl or wget directly into a shell."
+  },
+  {
+    "id": "CAG-015",
+    "source": "policy.md#CAG-015",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["Bash"],
+    "required_context": ["parameters.timeout"],
+    "severity": "medium",
+    "enforceability": "direct",
+    "text": "A Bash timeout must not exceed 300000 milliseconds."
+  },
+  {
+    "id": "CAG-016",
+    "source": "policy.md#CAG-016",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["WebFetch"],
+    "required_context": ["parameters.url"],
+    "severity": "high",
+    "enforceability": "direct",
+    "text": "WebFetch may only fetch HTTPS URLs."
+  },
+  {
+    "id": "CAG-017",
+    "source": "policy.md#CAG-017",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["WebFetch"],
+    "required_context": ["parameters.url"],
+    "severity": "high",
+    "enforceability": "direct",
+    "text": "WebFetch must not fetch from Pastebin, raw GitHub content, or GitHub Gists."
+  },
+  {
+    "id": "CAG-018",
+    "source": "policy.md#CAG-018",
+    "effect": "forbid",
+    "target_stages": ["PreToolUse"],
+    "target_tools": ["WebSearch"],
+    "required_context": ["parameters.query"],
+    "severity": "high",
+    "enforceability": "direct",
+    "text": "WebSearch must not search for password dumps, leaked credentials, or exposed API keys."
+  },
+  {
+    "id": "CAG-019",
+    "source": "policy.md#CAG-019",
+    "effect": "forbid",
+    "target_stages": ["ToolOutput"],
+    "target_tools": ["*"],
+    "required_context": ["content"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "Tool output containing a private-key header must be denied."
+  },
+  {
+    "id": "CAG-020",
+    "source": "policy.md#CAG-020",
+    "effect": "forbid",
+    "target_stages": ["ToolOutput"],
+    "target_tools": ["*"],
+    "required_context": ["content"],
+    "severity": "critical",
+    "enforceability": "direct",
+    "text": "Tool output containing AWS_SECRET_ACCESS_KEY or SECRET_TOKEN assignments must be denied."
+  }
+]

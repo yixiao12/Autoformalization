@@ -5,6 +5,7 @@ CedarPolicyEngine local harness implementation.
 import json
 import logging
 import uuid
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -85,6 +86,12 @@ class CedarPolicyHarness(AbstractHarness):
         storage: TrajectoryStorage | None = None,
         agent: Agent | None = None,
         logger: logging.Logger | None = None,
+        tool_call_context_enricher: (
+            Callable[[ToolCall], Mapping[str, object]] | None
+        ) = None,
+        tool_output_context_enricher: (
+            Callable[[ToolOutput], Mapping[str, object]] | None
+        ) = None,
     ):
         """Initialize the Cedar policy engine.
 
@@ -95,6 +102,10 @@ class CedarPolicyHarness(AbstractHarness):
             storage: Optional trajectory storage for persistence.
             agent: The agent to govern. Required for adjudication.
             logger: Logger instance.
+            tool_call_context_enricher: Optional deterministic callback that adds
+                schema-declared fields to PreToolUse context.
+            tool_output_context_enricher: Optional deterministic callback that adds
+                schema-declared fields to ToolOutput context.
 
         Raises:
             ValueError: If policy_set or schema is not provided.
@@ -104,6 +115,8 @@ class CedarPolicyHarness(AbstractHarness):
         self._trajectory_step_count: int = 0
         self._logger = logger or _LOGGER
         self._storage = storage or FileTrajectoryStorage()
+        self._tool_call_context_enricher = tool_call_context_enricher
+        self._tool_output_context_enricher = tool_output_context_enricher
 
         if schema is None:
             raise ValueError("schema is required")
@@ -523,7 +536,20 @@ class CedarPolicyHarness(AbstractHarness):
         }
         # Add typed parameters as optional local extension
         if tool_def and tool_def.parameters_json_schema and parameters is not None:
-            context_data["parameters"] = parameters
+            typed_parameters = self._schema_compatible_parameters(
+                tool_def.parameters_json_schema, parameters
+            )
+            if typed_parameters:
+                context_data["parameters"] = typed_parameters
+        if self._tool_call_context_enricher is not None:
+            extension = dict(self._tool_call_context_enricher(tool_call))
+            reserved = extension.keys() & context_data.keys()
+            if reserved:
+                names = ", ".join(sorted(reserved))
+                raise ValueError(
+                    f"tool-call context enrichment overwrites reserved fields: {names}"
+                )
+            context_data.update(extension)
 
         context = Context(context_data, schema=self._schema, action=action_uid)
 
@@ -548,6 +574,54 @@ class CedarPolicyHarness(AbstractHarness):
 
         arguments_json = json.dumps(arguments)
         return arguments_json, arguments if isinstance(arguments, dict) else None
+
+    @staticmethod
+    def _schema_compatible_parameters(
+        schema_text: str, parameters: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Keep fields representable by the generated typed Cedar record.
+
+        JSON Schema objects with no declared properties are useful grounding for
+        models but become empty Cedar records. Passing their arbitrary children
+        would violate the closed Cedar schema, so those values remain available
+        through ``context.arguments`` and deterministic context enrichers only.
+        """
+        try:
+            schema = json.loads(schema_text)
+        except json.JSONDecodeError:
+            return {}
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            return {}
+        compatible: dict[str, Any] = {}
+        for name, value in parameters.items():
+            if value is None:
+                continue
+            shape = properties.get(name)
+            if not isinstance(shape, dict):
+                continue
+            value_type = str(shape.get("type", "object")).lower()
+            if value_type == "object":
+                child_properties = shape.get("properties")
+                if not isinstance(child_properties, dict) or not child_properties:
+                    continue
+                if not isinstance(value, dict):
+                    continue
+            elif (
+                value_type == "string"
+                and not isinstance(value, str)
+                or value_type in {"integer", "number"}
+                and (not isinstance(value, (int, float)) or isinstance(value, bool))
+                or value_type == "boolean"
+                and not isinstance(value, bool)
+                or value_type == "array"
+                and not isinstance(value, list)
+            ):
+                continue
+            if value_type == "array" and isinstance(value, list):
+                value = [item for item in value if item is not None]
+            compatible[name] = value
+        return compatible
 
     def _tool_output_request(
         self,
@@ -577,10 +651,27 @@ class CedarPolicyHarness(AbstractHarness):
         if tool_def and tool_def.response_json_schema:
             try:
                 response_schema = json.loads(tool_def.response_json_schema)
-                if response_schema.get("type") in ["object", "OBJECT"]:
-                    context_data["response"] = json.loads(tool_output.output)
+                properties = response_schema.get("properties")
+                if (
+                    response_schema.get("type") in ["object", "OBJECT"]
+                    and isinstance(properties, dict)
+                    and properties
+                ):
+                    parsed_output = json.loads(tool_output.output)
+                    if isinstance(parsed_output, dict):
+                        context_data["response"] = parsed_output
             except json.JSONDecodeError:
                 pass  # Keep only content
+        if self._tool_output_context_enricher is not None:
+            extension = dict(self._tool_output_context_enricher(tool_output))
+            reserved = extension.keys() & context_data.keys()
+            if reserved:
+                names = ", ".join(sorted(reserved))
+                raise ValueError(
+                    "tool-output context enrichment overwrites reserved fields: "
+                    f"{names}"
+                )
+            context_data.update(extension)
 
         context = Context(context_data, schema=self._schema, action=action_uid)
 

@@ -1,0 +1,20 @@
+# Stable configuration for long Generator/Judge/Verifier experiments.
+model_provider = "OpenAI"
+model = "gpt-5.5"
+review_model = "gpt-5.5"
+model_reasoning_effort = "medium"
+judge_temperature = 0.3
+verifier_temperature = 0.1
+disable_response_storage = true
+max_output_tokens = 16384
+timeout_seconds = 600
+max_retries = 3
+retry_base_seconds = 10
+stream = false
+
+[model_providers.OpenAI]
+name = "OpenAI"
+base_url = "https://ai.input.im"
+wire_api = "responses"
+requires_openai_auth = true
+api_key_env = "OPENAI_API_KEY"

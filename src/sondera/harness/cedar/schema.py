@@ -109,7 +109,10 @@ def _schema_type_signature(schema_type: SchemaType) -> dict[str, Any]:
     return signature
 
 
-def _build_pre_tool_use_context(tools: list[Tool]) -> SchemaType:
+def _build_pre_tool_use_context(
+    tools: list[Tool],
+    extensions: dict[str, SchemaType] | None = None,
+) -> SchemaType:
     """Build the PreToolUse action context type.
 
     Always includes server-compatible fields:
@@ -167,10 +170,19 @@ def _build_pre_tool_use_context(tools: list[Tool]) -> SchemaType:
             type="Record", attributes=merged_params, required=False
         )
 
+    for name, extension in (extensions or {}).items():
+        if name in context_attributes:
+            raise ValueError(f"PreToolUse context extension conflicts with '{name}'")
+        extension.required = False
+        context_attributes[name] = extension
+
     return SchemaType(type="Record", attributes=context_attributes)
 
 
-def _build_tool_output_context(tools: list[Tool]) -> SchemaType:
+def _build_tool_output_context(
+    tools: list[Tool],
+    extensions: dict[str, SchemaType] | None = None,
+) -> SchemaType:
     """Build the ToolOutput action context type.
 
     Always includes server-compatible fields:
@@ -203,10 +215,21 @@ def _build_tool_output_context(tools: list[Tool]) -> SchemaType:
             type="Record", attributes=merged_response, required=False
         )
 
+    for name, extension in (extensions or {}).items():
+        if name in context_attributes:
+            raise ValueError(f"ToolOutput context extension conflicts with '{name}'")
+        extension.required = False
+        context_attributes[name] = extension
+
     return SchemaType(type="Record", attributes=context_attributes)
 
 
-def agent_to_cedar_schema(agent: Agent) -> CedarSchema:
+def agent_to_cedar_schema(
+    agent: Agent,
+    *,
+    pre_tool_context_extensions: dict[str, SchemaType] | None = None,
+    tool_output_context_extensions: dict[str, SchemaType] | None = None,
+) -> CedarSchema:
     """Convert an Agent to a Cedar Schema aligned with the server model.
 
     Creates a namespace named after the agent containing:
@@ -271,14 +294,16 @@ def agent_to_cedar_schema(agent: Agent) -> CedarSchema:
             appliesTo=AppliesTo(
                 principalTypes=["Agent"],
                 resourceTypes=["Tool"],
-                context=_build_pre_tool_use_context(tools),
+                context=_build_pre_tool_use_context(tools, pre_tool_context_extensions),
             )
         ),
         "ToolOutput": Action(
             appliesTo=AppliesTo(
                 principalTypes=["Agent"],
                 resourceTypes=["Trajectory"],
-                context=_build_tool_output_context(tools),
+                context=_build_tool_output_context(
+                    tools, tool_output_context_extensions
+                ),
             )
         ),
         "Prompt": Action(
