@@ -592,32 +592,5 @@ Autoformalization：25 passed
 Cedar Harness 回归：136 passed
 ```
 
-## 19. OpenCode 插件集成边界
-
-通用 Autoformalization 与 MedAgentBench 适配层已经分离。未来插件可直接调用：
-
-```python
-from sondera.autoformalization.benchmarks.medagentbench.experiment import (
-    generate_policy,
-    replay_policy,
-)
-```
-
-建议插件进一步抽象以下接口：
-
-```text
-RequirementAtomizer
-ToolDefinitionProvider
-ContextSchemaProvider
-RuntimeContextEnricher
-PolicyGenerator
-HardEvaluator
-SoftEvaluator
-TrajectoryAdapter
-ReplayEvaluator
-```
-
-其中最重要的约束是：Schema 中每个受信任的派生字段都必须有对应的确定性运行时
-Enricher。不能只让模型生成 Schema 字段，却没有程序负责可靠填充。
 
 
